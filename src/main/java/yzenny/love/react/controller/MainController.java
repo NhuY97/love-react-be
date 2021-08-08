@@ -11,12 +11,21 @@ import yzenny.love.react.model.UserInfoResponse;
 import yzenny.love.react.service.UserService;
 
 @RestController
+@RequestMapping("/api")
 public class MainController {
 
     @Autowired
     private UserService userService;
 
-    @GetMapping("/verify")
+    @GetMapping("/health-check")
+    public ResponseEntity<BaseResponse> healthCheck() {
+        BaseResponse response = new BaseResponse();
+        response.setStatus(0);
+        response.setMessage("OK");
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/verify")
     public ResponseEntity<UserInfoResponse> index(HttpServletRequest request) {
         UserInfoResponse userInfoResponse = new UserInfoResponse();
         String username = (String) request.getSession().getAttribute("username");
@@ -42,7 +51,7 @@ public class MainController {
         return ResponseEntity.ok(userInfoResponse);
     }
 
-    @GetMapping(path = "/create-user")
+    @GetMapping(path = "/user/create")
     public ResponseEntity<UserInfoResponse> doLogin(HttpServletRequest request, @RequestParam(defaultValue = "") String username) {
         UserInfoResponse userInfoResponse = new UserInfoResponse();
         username = username.trim();
@@ -68,7 +77,7 @@ public class MainController {
         return ResponseEntity.ok(userInfoResponse);
     }
 
-    @GetMapping(path = "/remove-user")
+    @GetMapping(path = "/user/remove")
     public ResponseEntity<BaseResponse> logout(HttpServletRequest request) {
         String username = (String) request.getSession().getAttribute("username");
         if (username != null && !username.isEmpty()) {
