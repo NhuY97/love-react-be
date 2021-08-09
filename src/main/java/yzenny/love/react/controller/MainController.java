@@ -2,12 +2,12 @@ package yzenny.love.react.controller;
 
 import javax.servlet.http.HttpServletRequest;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import yzenny.love.react.model.BaseResponse;
-import yzenny.love.react.model.UserInfo;
-import yzenny.love.react.model.UserInfoResponse;
+import yzenny.love.react.model.*;
+import yzenny.love.react.service.GameService;
 import yzenny.love.react.service.UserService;
 
 @RestController
@@ -16,6 +16,9 @@ public class MainController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private GameService gameService;
 
     @GetMapping("/health-check")
     public ResponseEntity<BaseResponse> healthCheck() {
@@ -26,9 +29,8 @@ public class MainController {
     }
 
     @GetMapping("/user/verify")
-    public ResponseEntity<UserInfoResponse> index(HttpServletRequest request) {
+    public ResponseEntity<UserInfoResponse> verify(@RequestParam(defaultValue = "") String username) {
         UserInfoResponse userInfoResponse = new UserInfoResponse();
-        String username = (String) request.getSession().getAttribute("username");
 
         if (username == null || username.isEmpty()) {
             userInfoResponse.setStatus(404);
@@ -38,7 +40,6 @@ public class MainController {
 
         UserInfo userInfo = userService.getUser(username);
         if (userInfo == null) {
-            request.getSession(true).invalidate();
             userInfoResponse.setStatus(404);
             userInfoResponse.setMessage("Not found!");
             return ResponseEntity.ok(userInfoResponse);
@@ -52,7 +53,7 @@ public class MainController {
     }
 
     @GetMapping(path = "/user/create")
-    public ResponseEntity<UserInfoResponse> doLogin(HttpServletRequest request, @RequestParam(defaultValue = "") String username) {
+    public ResponseEntity<UserInfoResponse> doLogin(@RequestParam(defaultValue = "") String username) {
         UserInfoResponse userInfoResponse = new UserInfoResponse();
         username = username.trim();
 
@@ -69,7 +70,6 @@ public class MainController {
         }
 
         UserInfo userInfo = userService.saveUser(username, "");
-        request.getSession().setAttribute("username", userInfo.getUsername());
 
         userInfoResponse.setStatus(0);
         userInfoResponse.setMessage("OK");
@@ -78,13 +78,10 @@ public class MainController {
     }
 
     @GetMapping(path = "/user/remove")
-    public ResponseEntity<BaseResponse> logout(HttpServletRequest request) {
-        String username = (String) request.getSession().getAttribute("username");
+    public ResponseEntity<BaseResponse> logout(@RequestParam(defaultValue = "") String username) {
         if (username != null && !username.isEmpty()) {
             userService.deleteUser(username);
         }
-
-        request.getSession(true).invalidate();
 
         BaseResponse response = new BaseResponse();
         response.setStatus(0);
@@ -92,4 +89,47 @@ public class MainController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping(path = "/game/create")
+    public ResponseEntity<GameIdResponse> createNewGame(@RequestParam(defaultValue = "") String username) {
+        GameIdResponse gameIdResponse = new GameIdResponse();
+        if (verify(username).getBody().getStatus() != 0) {
+            gameIdResponse.setMessage("User not found!");
+            gameIdResponse.setStatus(404);
+            return ResponseEntity.ok().body(gameIdResponse);
+        }
+
+        String roomId;
+        try {
+            roomId = gameService.createNewGame(username);
+        } catch (JsonProcessingException e) {
+            gameIdResponse.setMessage("Create new room occurs error!");
+            gameIdResponse.setStatus(500);
+            return ResponseEntity.ok().body(gameIdResponse);
+        }
+        userService.saveUser(username, roomId);
+
+        gameIdResponse.setRoomId(roomId);
+        gameIdResponse.setMessage("OK");
+        gameIdResponse.setStatus(0);
+        return ResponseEntity.ok().body(gameIdResponse);
+    }
+
+    @GetMapping(path = "/game/quit")
+    public ResponseEntity<BaseResponse> quitGame(@RequestParam(defaultValue = "") String username) {
+        BaseResponse baseResponse = new BaseResponse();
+
+        UserInfo userInfo = userService.getUser(username);
+        if (userInfo == null) {
+            baseResponse.setStatus(404);
+            baseResponse.setMessage("Not found!");
+            return ResponseEntity.ok(baseResponse);
+        }
+
+        userService.saveUser(userInfo.getUsername(), "");
+
+        BaseResponse response = new BaseResponse();
+        response.setStatus(0);
+        response.setMessage("OK");
+        return ResponseEntity.ok(response);
+    }
 }
